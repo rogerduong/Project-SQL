@@ -11,8 +11,18 @@ Singapore Postal Code system
 
 * http://eresources.nlb.gov.sg/infopedia/articles/SIP_1006_2010-05-27.html
 
+## Workflow
+This project is organized with the following workflow:
+1. Launch the audit scripts to explore the dataset (```audit.py```)
+2. Identify problems encountered in the map, develop programmatic ways to solve those issues and include them into ```transform.py```
+3. Extract the data from the osm dataset (```load.py```)
+4. Transform the extracted dataset by calling (```transform.py```)
+5. Load the transformed dataset into csv files (```load.py```)
+6. Load the csv files into a sqlite3 database (```schema.sql```)
+7. Run SQL queries to explore the map dataset 
+
 ## Problems Encountered in the Map
-After extracting a sample of the entire dataset, and running it through an audit.py file, I noticed the following issues:
+This section we discuss the findings of the step 2 of the workflow. After extracting a sample of the entire dataset, and running it through an audit.py file, we can notice the following issues:
 
 1. Incorrect street types.
 2. Incorrect postal codes.
@@ -142,7 +152,7 @@ def clean_postal_code(old_postal_code, house_number, street_name):
 ```
 
 ## Data Overview
-This section contains basic statistics about the dataset.
+This section discusses the findings of the setp 7 of the project workflow. It describes basic statistics about the dataset.
 
 ### File sizes
 The summary of file size is returned by a helper function in the load.py file.
@@ -207,6 +217,7 @@ dmastin82,16963
 ```
 
 ## Data Exploration
+This section further drills down on the dataset. It discusses some findings of step 7 of the project workflow.
 
 ### Top 10 appearing amenities
 Let's start the exploration by looking at the most frequent amenities listed in this map.
@@ -427,4 +438,8 @@ The list of leisure facilities appears cleaner than the list of food & beverage 
 One explanation can be that entries for restaurants business are changing more frequently that entries for sport facilities. It is common to see restaurants open and close within 2 years. Because of this higher frequency, user-defined information about restaurant businesses have a higher propensity to have inconsistent data.
 
 Another explanation is that information on food & beverage amenities is by nature harder to classify than sports and leisure amenities. A basketball court is easily identified, while a cafe serving pizzas and chinese noodles is more challenging to categorize (and surprisingly, there are such places...).
+
 ## Conclusion
+This data wrangling exercice on Singapore Open Street Map data highlights that there is a great wealth of information available for further analysis. However there is room for further cleaning, especially in the fields of food and beverage location information.
+
+With some further scripting, it will be feasible to clean up some of this information.
