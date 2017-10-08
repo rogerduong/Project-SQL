@@ -1,5 +1,7 @@
 # OpenStreetMap Data Case Study
 
+Roger Duong October 2017
+
 ## Map Area
 
 Singapore
