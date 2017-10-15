@@ -39,10 +39,27 @@ mapping = {
 }
 
 postal_code_html_page = 'http://www.singpost.com/find-postal-code'
+postal_code_incorrect_5 = re.compile(r'[0-9]{5}$')
+postal_code_incorrect_6 = re.compile(r'[0-9]{6}$')
 
 def clean_street_name(street_name, mapping):
     """Clean street name, by replacing dictionary strings found
-    in street_name in mapping"""
+    in street_name in mapping
+    
+    Args:
+        street_name: string of street name
+        mapping: dictionary of incorrect and correct street types
+    Returns:
+        new_street_name: cleaned street name
+    
+    """
+    
+    if audit.lower.match(street_name):
+        street_name = street_name.title()
+    elif audit.lower_colon.match(street_name):
+        street_name = re.sub(audit.lower_colon, ' ', street_name)
+    elif audit.problemchars.match(street_name):
+        street_name = re.sub(audit.problemchars, ' ', street_name)
     
     m_end = audit.street_type_end.search(street_name)
     m_num = audit.street_type_num.search(street_name)
@@ -61,7 +78,18 @@ def clean_street_name(street_name, mapping):
         return(new_street_name)
 
 def get_postal_code(html_page, house_number, street_name):
-    """Get Postal Code from web page of Singapore Post"""
+    """Get Postal Code from web page of Singapore Post
+    
+    This function performs a post request on the specified url and then scrapes
+    the results page.
+    
+    Args:
+        html_page: url of singpost postal code search page
+        house_number: string of house number
+        street_name: string of street_name
+    Returns:
+        postal_code: string of correct postal code returned by web request
+    """
     
     time.sleep(5) #Delay start of scraping for 5 seconds
     
@@ -86,23 +114,41 @@ def get_postal_code(html_page, house_number, street_name):
 
 def clean_postal_code(old_postal_code, house_number, street_name):
     """Clean postal code, by replacing old_postal_code with new name retrieved
-    from Singapore Post"""
+    from Singapore Post
     
-    if len(old_postal_code) != 6:
-        if ' ' in old_postal_code: #to account for postal codes like 'Singapore 123456'
-            new_postal_code = old_postal_code.replace(' ','')[-6:]
-        elif len(old_postal_code) == 5: #account for leading zeros being removed
-            new_postal_code = '0' + old_postal_code
-        else: #get the postal code by querying the Singapore Post website
-            get_result = get_postal_code(postal_code_html_page, house_number, street_name)
-            if get_result != 'Error':
-                new_postal_code = get_result
-                print('Successfully retrieved postal code from Singpost for')
-            else:
-                new_postal_code = old_postal_code
-                print('Error retrieving postal code from Singpost for')
-        print(house_number + ' ' + street_name)
-        print(old_postal_code + ' --> ' + str(new_postal_code))
-        return(new_postal_code)
-    else:
+    Args:
+        old_postal_code: string of postal code to clean
+        house_number: string of house number
+        street_name: string of street name
+    Returns:
+        new_postal_code: string of cleaned postal code
+    
+    """
+    
+    if audit.postal_code_correct.match(old_postal_code):
         return(old_postal_code)
+        
+        #if ' ' in old_postal_code: #to account for postal codes like 'Singapore 123456'
+        #    new_postal_code = old_postal_code.replace(' ','')[-6:]
+        #elif len(old_postal_code) == 5: #account for leading zeros being removed
+        #    new_postal_code = '0' + old_postal_code
+        
+    elif postal_code_incorrect_5.match(old_postal_code):
+        #to account for leading zeros being removed
+        new_postal_code = '0' + old_postal_code
+    elif postal_code_incorrect_6.match(old_postal_code):
+        #to account for postal codes like 'Singapore 123456'
+        new_postal_code = old_postal_code[-6:]
+    else: #get the postal code by querying the Singapore Post website
+        get_result = get_postal_code(postal_code_html_page, house_number, street_name)
+        if get_result != 'Error':
+            new_postal_code = get_result
+            print('Successfully retrieved postal code from Singpost for')
+        else:
+            new_postal_code = old_postal_code
+            print('Error retrieving postal code from Singpost for')
+    
+    print(house_number + ' ' + street_name)
+    print(old_postal_code + ' --> ' + str(new_postal_code))
+    return(new_postal_code)
+        

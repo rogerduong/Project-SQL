@@ -1,14 +1,22 @@
 # OpenStreetMap Data Case Study
 
-Roger Duong October 2017
+Roger Duong October 2017 (Rev. 2)
+
+## Outline
+
+- Map Area
+- Workflow
+- Problems Encountered in the Map
+- Data Overview
+- Data Exploration
+- Conclusion
+- Additional Ideas
 
 ## Map Area
 
-Singapore
+The map used is the city I currently live in: Singapore
 
 - <https://www.openstreetmap.org/export#map=12/1.3450/103.8500>
-
-The map used is the city I currently live in.
 
 ### Sources
 
@@ -53,54 +61,6 @@ It should be noted that in Singapore street types may appear:
 
 The helper function `audit_street_type` in audit.py takes into account those locale specifics.
 
-```python
-mapping = {
-    'Lor' : 'Lorong',
-    'Terrance' : 'Terrace',
-    'terrace' : 'Terrace',
-    'St' : 'Street',
-    'Upp' : 'Upper',
-    'road' : 'Road',
-    'Rd' : 'Road',
-    ' rd' : ' Road',
-    'Roadc' : 'Road',
-    'Roads' : 'Road',
-    'Pl' : 'Place',
-    'Jln' : 'Jalan',
-    'aenue' : 'Avenue',
-    'Ave' : 'Avenue',
-    'Avebue' : 'Avenue',
-    'AveNue' : 'Avenue',
-    'avenue' : 'Avenue',
-    'Blvd' : 'Boulevard',
-    'Dr' : 'Drive',
-    'drive' : 'Drive',
-    'garden' : 'Garden',
-    'geylang' : 'Geylang',
-    'park' : 'Park',
-}
-
-def clean_street_name(street_name, mapping):
-    """Clean street name, by replacing dictionary strings found
-    in street_name in mapping"""
-
-    m_end = audit.street_type_end.search(street_name)
-    m_num = audit.street_type_num.search(street_name)
-    street_type = ''
-    if m_end:
-        street_type = m_end.group()
-    elif m_num:
-        if len(re.split(' ', street_name)) >=2:
-            street_type = re.split(' ', street_name)[-2]
-        else:
-            street_type = re.split(' ', street_name)[-1]
-
-    if street_type in mapping.keys():
-        new_street_name = street_name.replace(street_type, mapping[street_type])
-        print(street_name+ ' --> ' + new_street_name)
-        return(new_street_name)
-```
-
 ### Postal Codes
 
 Singapore uses a postal code system where each postal delivery point –usually each building– is identified with a unique 6-digit postal code. Therefore entries with anything other than 6 digits are incorrect.
@@ -111,70 +71,13 @@ Initial audit of the data revealed the following types of incorrect entries:
 2. Entries of 5 characters, where the leading zero of the correct entry has been stripped down, probably by casting the postal code to an integer type. Solving these incorrect entries require only to add the leading zero.
 3. Other incorrect entries not falling into the categories above. Solving the incorrect entries can be done by querying the Singapore Post website, which has a page to search for postal codes for a given house number and street. This required a helper function to scrape the webpage and to retrieve the data. The helper function to get the postal code incorporate some time delay and user-agent parameters to avoid being blocked by the Singapore Post website after repeated queries. Because of the time delay, it was important to treat the highest number of incorrect entries by the methods 1 and 2 above, to avoid slow script execution.
 
-```python
-def get_postal_code(html_page, house_number, street_name):
-    """Get Postal Code from web page of Singapore Post"""
-
-    time.sleep(5) #Delay start of scraping for 5 seconds
-
-    headers = {'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36'}
-    data = {'building': house_number,
-            'street_name': street_name}
-
-    r = requests.post(html_page, data=data, headers=headers, timeout=2)
-
-    c = r.content    
-    soup = BeautifulSoup(c, "lxml")
-
-    result = soup.find(id = 'datatable-1')
-
-    if result is not None: #scrape through the result page to datatable-1
-        for val in result.findAll('p'):
-            if len(val.text) == 6:
-                postal_code = val.text
-        return postal_code
-    else:
-        return('Error')
-
-def clean_postal_code(old_postal_code, house_number, street_name):
-    """Clean postal code, by replacing old_postal_code with new name retrieved
-    from Singapore Post"""
-
-    if len(old_postal_code) != 6:
-        if ' ' in old_postal_code: #to account for postal codes like 'Singapore 123456'
-            new_postal_code = old_postal_code.replace(' ','')[-6:]
-        elif len(old_postal_code) == 5: #account for leading zeros being removed
-            new_postal_code = '0' + old_postal_code
-        else: #get the postal code by querying the Singapore Post website
-            get_result = get_postal_code(postal_code_html_page, house_number, street_name)
-            if get_result != 'Error':
-                new_postal_code = get_result
-                print('Successfully retrieved postal code from Singpost for')
-            else:
-                new_postal_code = old_postal_code
-                print('Error retrieving postal code from Singpost for')
-        print(house_number + ' ' + street_name)
-        print(old_postal_code + ' --> ' + str(new_postal_code))
-        return(new_postal_code)
-    else:
-        return(old_postal_code)
-```
-
 ## Data Overview
 
 This section discusses the findings of the setp 7 of the project workflow. It describes basic statistics about the dataset.
 
 ### File sizes
 
-The summary of file size is returned by a helper function in the load.py file.
-
-```python
-def summarize_dataset(dataset):
-    """Return summary of dataset filesize"""
-    for file in dataset:
-        filename = re.split('/', file)[-1]
-        print(filename + '\t{0:.2f} MB'.format(os.path.getsize(file)/(10**6)))
-```
+The summary of file size is returned by a helper function `summarize_dataset` in the load.py file.
 
 ```
 singapore.osm   211.41 MB
@@ -243,36 +146,9 @@ dmastin82,16963
 
 This section further drills down on the dataset. It discusses some findings of step 7 of the project workflow.
 
-### Top 10 appearing amenities
-
-Let's start the exploration by looking at the most frequent amenities listed in this map.
-
-```sql
-SELECT tags.key, tags.value, COUNT(*) as count
-FROM (SELECT * FROM nodes_tags UNION ALL
-      SELECT * FROM ways_tags) tags
-WHERE tags.key = "amenity"
-GROUP BY tags.value
-ORDER BY count DESC
-LIMIT 10;
-```
-
-```sql
-amenity,restaurant,1755
-amenity,parking,1689
-amenity,atm,702
-amenity,cafe,459
-amenity,school,458
-amenity,place_of_worship,381
-amenity,fast_food,315
-amenity,taxi,310
-amenity,bank,230
-amenity,swimming_pool,230
-```
-
 ### Total number of restaurants
 
-From the previous query, we can see that there are lots of restaurants. This is not surprising as in Singapore, we love to eat out. So let's show some statistics about our restaurants.
+In Singapore, we love to eat out. So let's show some statistics about our restaurants.
 
 ```sql
 SELECT COUNT(*) as count
@@ -288,7 +164,7 @@ WHERE nodes_tags.key = "cuisine";
 636
 ```
 
-### List top 20 cuisines of restaurants
+### List top 10 cuisines of restaurants
 
 Let's further drill down by returning the top most frequent cuisines of restaurants.
 
@@ -302,7 +178,7 @@ FROM nodes_tags
 WHERE nodes_tags.key = "cuisine"
 GROUP BY nodes_tags.value
 ORDER BY count DESC
-LIMIT 20;
+LIMIT 10;
 ```
 
 ```sql
@@ -316,16 +192,6 @@ asian,31
 thai,29
 french,15
 seafood,13
-burger,12
-international,9
-regional,9
-vegetarian,6
-vietnamese,6
-western,6
-american,5
-chicken,5
-indonesian,5
-steak_house,5
 ```
 
 As we can see, although Chinese cuisine –unsurprisingly– dominates the types of cuisines, there is a very wide variety of cuisines. This truly makes Singapore a cosmopolitain city!
@@ -348,7 +214,7 @@ WHERE nodes_tags.key = "cuisine";
 91
 ```
 
-### List top 20 styles of cafe
+### List top 10 styles of cafe
 
 We further drill down with the style of cafes.
 
@@ -362,7 +228,7 @@ FROM nodes_tags
 WHERE nodes_tags.key = "cuisine"
 GROUP BY nodes_tags.value
 ORDER BY count DESC
-LIMIT 20;
+LIMIT 10;
 ```
 
 ```sql
@@ -376,126 +242,98 @@ asian,2
 coffee_shop;regional,2
 french,2
 "Hawker or Foodcourt, Chinese",1
-Nanyang_Coffee,1
-Western/Italian,1
-acai,1
-american;italian_pizza,1
-breakfast;coffee_shop,1
-cafe,1
-cafe/diner,1
-cake,1
-chicken,1
-coffee_shop;coffee,1
 ```
 
 Looking at the list of styles for cafes, it appears that the entries should be further cleaned:
 
-- some entries contain multiple categories separated by a semi-colon or a slash like: `coffee_shop;regional`
-- some entries have inconsistent capitalization like: `Western` and `asian`
-- some entries are registered as strings within quotation marks like `"Hawker or Foodcourt, Chinese"`
+1. some entries have inconsistent capitalization like: `Western` and `asian`. These values can be easily cleaned through regular expression operations, similarly to what was done for the street names.
+2. some entries contain multiple values separated by a semi-colon or a slash like: `coffee_shop;regional` or `Western/Italian`.
+3. some entries are registered as strings within quotation marks like `"Hawker or Foodcourt, Chinese"`. Those are special cases of multivalued keys.
 
-  ### List top 20 styles of fast-foods
+### List top 10 styles of fast-foods
 
-  We run the same type of analysis for the fast-foods.
-
-  ```sql
-  SELECT nodes_tags.value, COUNT(*) as count
-  FROM nodes_tags
-    JOIN (SELECT DISTINCT(id)
-    FROM nodes_tags
-    WHERE nodes_tags.value = "fast_food") as nt
-    ON nt.id = nodes_tags.id
-  WHERE nodes_tags.key = "cuisine"
-  GROUP BY nodes_tags.value
-  ORDER BY count DESC
-  LIMIT 20;
-  ```
-
-  ```sql
-  burger,59
-  chicken,27
-  sandwich,13
-  pizza,12
-  chinese,7
-  fast_food,5
-  ice_cream,5
-  asian,4
-  american,2
-  japanese,2
-  kebab,2
-  regional,2
-  "Curry Puffs",1
-  Fried_Chicken,1
-  Hawker_Centre,1
-  Sandwich,1
-  american;burger,1
-  burger;japanese,1
-  coffee_shop,1
-  fish;burger;breakfast;ice_cream;tea;cake;coffee_shop;american;chicken,1
-  ```
-
-  This list of nodes tags shows the same data quality issues as the nodes tags on cafes.
-
-  ### List of top 10 sports
-
-  Singapore has the reputation of being a great city for active people. So let's take a look at the sport amenities and other outdoor facilities for leisure.
-
-  ```sql
-  SELECT tags.value, COUNT(*) as count
-  FROM (SELECT * FROM nodes_tags UNION ALL
-      SELECT * FROM ways_tags) tags
-  WHERE tags.key = "sport"
-  GROUP BY tags.value
-  ORDER BY count DESC
-  LIMIT 10;
-  ```
-
-  ```sql
-  tennis,358
-  swimming,302
-  basketball,114
-  soccer,81
-  golf,32
-  multi,16
-  badminton,12
-  running,12
-  equestrian,7
-  yoga,7
-  ```
-
-### List of top 10 leisure
+We run the same type of analysis for the fast-foods.
 
 ```sql
-SELECT tags.value, COUNT(*) as count
-FROM (SELECT * FROM nodes_tags UNION ALL
-      SELECT * FROM ways_tags) tags
-WHERE tags.key = "leisure"
-GROUP BY tags.value
+SELECT nodes_tags.value, COUNT(*) as count
+FROM nodes_tags
+JOIN (SELECT DISTINCT(id)
+FROM nodes_tags
+WHERE nodes_tags.value = "fast_food") as nt
+ON nt.id = nodes_tags.id
+WHERE nodes_tags.key = "cuisine"
+GROUP BY nodes_tags.value
 ORDER BY count DESC
 LIMIT 10;
 ```
 
 ```sql
-swimming_pool,944
-pitch,804
-park,475
-playground,211
-park_connector,80
-sports_centre,72
-fitness_centre,58
-garden,41
-fitness_station,33
-recreation_ground,23
+burger,59
+chicken,27
+sandwich,13
+pizza,12
+chinese,7
+fast_food,5
+ice_cream,5
+asian,4
+american,2
+japanese,2
 ```
 
-The list of leisure facilities appears cleaner than the list of food & beverage locations (restaurants, cafes and fast-foods).
-
-One explanation can be that entries for restaurants business are changing more frequently that entries for sport facilities. It is common to see restaurants open and close within 2 years. Because of this higher frequency, user-defined information about restaurant businesses have a higher propensity to have inconsistent data.
-
-Another explanation is that information on food & beverage amenities is by nature harder to classify than sports and leisure amenities. A basketball court is easily identified, while a cafe serving pizzas and chinese noodles is more challenging to categorize (and surprisingly, there are such places...).
+Running this query for more items would show the same data quality issues as the nodes tags on cafes. The entries can be cleaned using the an identical script.
 
 ## Conclusion
 
-This data wrangling exercice on Singapore Open Street Map data highlights that there is a great wealth of information available for further analysis. However there is room for further cleaning, especially in the fields of food and beverage location information.
+This data wrangling exercice on Singapore Open Street Map data highlights that there is a great wealth of information available for further analysis.
 
-With some further scripting, it will be feasible to clean up some of this information.
+## Additional Ideas
+
+The data on restaurant, cafe and fast-foods can be used for marketing and consulting analyses.
+
+### Problem Statement and Value Proposition
+
+Existing and future F&B managers frequently face the following problems:
+
+- When setting up a new restaurant:
+
+  - If it is a new oulet of an existing franchise: Where to locate the restaurant? Where is the competition? What is the accessibility (travel time, car park ,public transportation)?
+  - If it is the first outlet: Same questions and in addition: Which cuisine? Which clientele (casual, fine dining etc.)?
+
+- Existing restaurant makeover: Which cuisine? Which clientele (casual, fine dining etc.)?
+
+We can imagine to develop a web-accessible restaurant data analytics, using various map data sources to overlay data on restaurants businesses. And what about even incorporating some recommendation features in the analytics. The ultimate goal would be to help decision-makers to determine the characteristics of restaurant to open that would be likely to be more successful. This platform would make the analytical process less time consuming, and more accurate.
+
+Access to this platform could be monetized to restaurant consultants. Those restaurant consultants would then sell their services to F&B management companies, F&B managers, or individuals looking at starting a restaurant business.
+
+The datasets to include would be:
+
+- OpenStreetMap datasets for location of outlets, car parks, public transportation facilities.
+- Singapore open data sets <https://data.gov.sg/> for demographics, finance, transportation among others.
+- Yelp datasets <https://www.yelp.com.sg/dataset> for restaurant reviews notably.
+- some dataset to measure travel time from certain points
+
+### Limitations
+
+One limitation is that some information of the micro-environment of a specific location cannot be captured by those macroscopic datasets: for example it would not be possible to take into account the location of an outlet within a shopping mall, and what would be the effect on the business of some location-specific features (eg. the effect of a corner unit versus a row unit in a shopping mall would not be accurately modelled). This could be overcome by allowing for some user specific entries.
+
+### Anticipated Problems
+
+#### Cleaning
+
+In the restaurant, cafe and fast-foods tags, many entries have the usual user-entered issues of capitalisation, and typos errors. Those can be cleaned through scripting similar to what was done for street names.
+
+#### Data Integration
+
+The analytics platform would integrate multiple datasets, with their own schemas and conventions. Integrating them into a meaningful larger dataset would require a careful work on:
+
+- adapting the schemas,
+- managing the refresh of dataset.
+
+#### Multivalue keys
+
+The OSM dataset contains many entries with multiple value for the key `cuisine`, separated by a colon. Putting the analytics platform together would require to define a strategy to interpret the multivalue key. We can use the same method employed to split street names. Finding a way to treat multivalue keys is important to provide sufficient richness to the data.
+
+Possible options are already discussed here:
+
+- <http://wiki.openstreetmap.org/wiki/Multiple_values>
+- <http://wiki.openstreetmap.org/wiki/Proposed_features/Multivalued_Keys>.

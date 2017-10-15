@@ -45,7 +45,17 @@ WAY_NODES_FIELDS = ['id', 'node_id', 'position']
 
 def shape_element(element, node_attr_fields=NODE_FIELDS, way_attr_fields=WAY_FIELDS,
                   problem_chars=PROBLEMCHARS, default_tag_type='regular'):
-    """Clean and shape node or way XML element to Python dict"""
+    """Clean and shape node or way XML element to Python dict
+    
+    Args:
+        element:
+        node_attr_fields=NODE_FIELDS
+        way_attr_fields=WAY_FIELDS
+        problem_chars=PROBLEMCHARS
+    Returns:
+        A dictionary
+    
+    """
 
     node_attribs = {}
     way_attribs = {}
@@ -117,7 +127,16 @@ def shape_element(element, node_attr_fields=NODE_FIELDS, way_attr_fields=WAY_FIE
 # ================================================== #
 
 def get_element(osm_file, tags=('node', 'way', 'relation')):
-    """Yield element if it is the right type of tag"""
+    """Yield element if it is the right type of tag
+    
+    Args:
+        osm_file: OSM file
+        tags: tags type to select
+
+    Returns:
+        element   
+        
+    """
 
     context = ET.iterparse(osm_file, events=('start', 'end'))
     _, root = next(context)
@@ -131,7 +150,17 @@ def get_element(osm_file, tags=('node', 'way', 'relation')):
 # ================================================== #
 
 def clean_element_dict(element_dict, tag_type):
-    """Retrieve street name, postal code, and house number for cleaning"""
+    """Retrieve street name, postal code, and house number for cleaning
+    
+    This function calls functions in transform.py
+    
+    Args:
+        element_dict: element dictionary to clean
+        tag_type: tag type to select
+    Returns:
+        element_dict: cleaned element dictionary
+    
+    """
     street_name = ''
     postal_code = ''
     house_number = ''
@@ -160,7 +189,15 @@ def clean_element_dict(element_dict, tag_type):
 # ================================================== #
 
 def validate_element(element, validator, schema=SCHEMA):
-    """Raise ValidationError if element does not match schema"""
+    """Raise ValidationError if element does not match schema
+    
+    Args:
+        element: element to validate
+        validator: validator (cerberus)
+        schema: schema to validate against
+    Returns:
+        validation results
+    """
     #v = validator(schema)
     if validator.validate(element, schema) is not True:
         field, errors = next(validator.errors.iteritems())
@@ -183,7 +220,14 @@ class UnicodeDictWriter(csv.DictWriter, object):
             self.writerow(row)
 
 def summarize_dataset(dataset):
-    """Return summary of dataset filesize"""
+    """Return summary of dataset filesize
+    
+    Args:
+        dataset: list of files to summarize
+    Returns:
+        print out of file size summary
+    
+    """
     for file in dataset:
         filename = re.split('/', file)[-1]
         print(filename + '\t{0:.2f} MB'.format(os.path.getsize(file)/(10**6)))
@@ -194,7 +238,15 @@ def summarize_dataset(dataset):
 #               Main Function                        #
 # ================================================== #
 def process_map(file_in, validate):
-    """Iteratively process each XML element and write to csv(s)"""
+    """Iteratively process each XML element and write to csv(s)
+    
+    Args:
+        file_in: input OSM file
+        validate: boolean to specify if data must be validated or not
+    Returns:
+        csv files
+    
+    """
 
     with codecs.open(NODES_PATH, 'w') as nodes_file, \
          codecs.open(NODE_TAGS_PATH, 'w') as nodes_tags_file, \
